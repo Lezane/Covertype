@@ -1,0 +1,9 @@
+torch
+scikit-learn
+pandas
+matplotlib
+numpy
+pytorch-tabnet
+
+pip install -r requirements.txt
+pip install rtdl --no-deps
