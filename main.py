@@ -101,7 +101,7 @@ def get_cifar10_model(model_name, device):
 
     return model.to(device)
 
-def get_cifar10_dataloaders(device, batch_size):
+def get_cifar10_dataloaders(device, batch_size, remove_percentage):
     hf_dataset = load_dataset("uoft-cs/cifar10")
     
     def create_dataset(train=True):
@@ -113,7 +113,17 @@ def get_cifar10_dataloaders(device, batch_size):
         plane_idx, car_idx, other_idx = np.where(targets == 0)[0], np.where(targets == 1)[0], np.where(targets > 1)[0]
         rng = np.random.RandomState(42)
 
-        keep_planes, keep_cars = (int(len(plane_idx)*0.95), int(len(car_idx)*0.05)) if train else (int(len(plane_idx)*0.50), int(len(car_idx)*0.50))
+        # Calculate dynamic keep ratio based on passed argument
+        keep_cars_ratio = (100.0 - remove_percentage) / 100.0
+        
+        if train:
+            keep_planes = int(len(plane_idx) * 0.95)
+            keep_cars = int(len(car_idx) * keep_cars_ratio)
+        else:
+            # For testing, we keep 50% to maintain a balanced test set comparison
+            keep_planes = int(len(plane_idx) * 0.50)
+            keep_cars = int(len(car_idx) * 0.50)
+            
         indices = np.concatenate([rng.choice(plane_idx, keep_planes, False), rng.choice(car_idx, keep_cars, False), other_idx])
         rng.shuffle(indices)
 
@@ -222,6 +232,10 @@ def main():
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--batch-size', type=int, default=256)
     parser.add_argument('--arch', type=str, default='vgg19_bn', help="Architecture for CIFAR10")
+    
+    # >>> NEW ARGUMENT: dynamic remove_percentage
+    parser.add_argument('--remove-percentage', type=float, default=95.0, help="Percentage of CIFAR-10 Cars to remove in training")
+    
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--output-dir', type=str, default='./plots')
     args = parser.parse_args()
@@ -236,7 +250,8 @@ def main():
     print(f"Using device: {device}\n")
 
     if args.dataset == 'cifar10':
-        train_ldr, eval_ldr, test_ldr = get_cifar10_dataloaders(device, args.batch_size)
+        print(f"Using CIFAR-10 with remove-percentage: {args.remove_percentage}%")
+        train_ldr, eval_ldr, test_ldr = get_cifar10_dataloaders(device, args.batch_size, args.remove_percentage)
         base_model = get_cifar10_model(args.arch, device)
     else:
         # >>> INTEGRATION POINT FOR EXISTING COVERTYPE FILES <<<
@@ -248,28 +263,28 @@ def main():
         # train_ldr, eval_ldr, test_ldr = get_covertype_loaders(device, args.batch_size)
         # base_model = CovertypeNet().to(device)
         
-        print("Integration Note: Please uncomment and import your Covertype dataloaders and model at line ~228 of main.py!")
+        print("Integration Note: Please uncomment and import your Covertype dataloaders and model at line ~242 of main.py!")
         return
 
     initial_state = copy.deepcopy(base_model.state_dict())
     is_cf = (args.dataset == 'cifar10')
 
     # --- Run 1: AdamW ---
-    print(f"=== Training AdamW on {args.dataset.upper()} ===")
+    print(f"\n=== Training AdamW on {args.dataset.upper()} ===")
     model_adamw = copy.deepcopy(base_model)
     model_adamw.load_state_dict(initial_state)
     opt_adamw = optim.AdamW(model_adamw.parameters(), lr=1e-3, weight_decay=1e-2)
-    train_and_track(model_adamw, opt_adamw, train_ldr, eval_ldr, test_ldr, device, args.epochs, f"AdamW_{args.dataset}", args.output_dir, is_cifar=is_cf)
+    train_and_track(model_adamw, opt_adamw, train_ldr, eval_ldr, test_ldr, device, args.epochs, f"AdamW_{args.dataset}_{args.remove_percentage}pct", args.output_dir, is_cifar=is_cf)
 
     # --- Run 2: SGD ---
-    print(f"=== Training SGD on {args.dataset.upper()} ===")
+    print(f"\n=== Training SGD on {args.dataset.upper()} ===")
     model_sgd = copy.deepcopy(base_model)
     model_sgd.load_state_dict(initial_state)
     opt_sgd = optim.SGD(model_sgd.parameters(), lr=1e-2, momentum=0.9, weight_decay=5e-4)
-    train_and_track(model_sgd, opt_sgd, train_ldr, eval_ldr, test_ldr, device, args.epochs, f"SGD_{args.dataset}", args.output_dir, is_cifar=is_cf)
+    train_and_track(model_sgd, opt_sgd, train_ldr, eval_ldr, test_ldr, device, args.epochs, f"SGD_{args.dataset}_{args.remove_percentage}pct", args.output_dir, is_cifar=is_cf)
 
     # --- Run 3: Muon ---
-    print(f"=== Training Muon on {args.dataset.upper()} ===")
+    print(f"\n=== Training Muon on {args.dataset.upper()} ===")
     model_muon = copy.deepcopy(base_model)
     model_muon.load_state_dict(initial_state)
     
@@ -277,7 +292,7 @@ def main():
     other_params = [p for p in model_muon.parameters() if p.ndim < 2]
     opt_muon = Muon(muon_params, lr=0.02, momentum=0.95, nesterov=True)
     opt_other = optim.AdamW(other_params, lr=1e-3, weight_decay=1e-2)
-    train_and_track(model_muon, [opt_muon, opt_other], train_ldr, eval_ldr, test_ldr, device, args.epochs, f"Muon_{args.dataset}", args.output_dir, is_cifar=is_cf)
+    train_and_track(model_muon, [opt_muon, opt_other], train_ldr, eval_ldr, test_ldr, device, args.epochs, f"Muon_{args.dataset}_{args.remove_percentage}pct", args.output_dir, is_cifar=is_cf)
 
 if __name__ == '__main__':
     main()
