@@ -1,6 +1,8 @@
-torch
+torch>=2.0.0
+torchvision
 scikit-learn
 pandas
 matplotlib
 numpy
 pytorch-tabnet
+datasets
