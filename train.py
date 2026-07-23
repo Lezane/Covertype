@@ -1,4 +1,5 @@
 import os
+import csv  # <-- Added: import the built-in csv module
 import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
@@ -64,7 +65,27 @@ def train_and_track(model, optimizers, trainloader, testloader, device, epochs=2
         
         print(f"[{experiment_name}] Epoch {epoch:03d}/{epochs} | Test Acc S0: {test_s0:5.2f}% | Test Acc S1: {test_s1:5.2f}%")
 
+    # ---------------------------------------------------------
+    # Setup directory and filenames
+    # ---------------------------------------------------------
+    safe_name = experiment_name.replace(" ", "_").lower()
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # ---------------------------------------------------------
+    # Save the CSV logs (NEW CODE)
+    # ---------------------------------------------------------
+    csv_path = os.path.join(output_dir, f"{safe_name}_logs.csv")
+    with open(csv_path, mode='w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(["Epoch", "Test_Acc_S0", "Test_Acc_S1"])  # Header row
+        for epoch_idx in range(len(test_acc_s0_history)):
+            writer.writerow([epoch_idx, test_acc_s0_history[epoch_idx], test_acc_s1_history[epoch_idx]])
+    
+    print(f"Saved training logs to {csv_path}")
+
+    # ---------------------------------------------------------
     # Save final plot after training
+    # ---------------------------------------------------------
     fig, axs = plt.subplots(1, 2, figsize=(12, 4))
     fig.suptitle(f"{experiment_name} | Final Epoch {epochs}", fontsize=16, fontweight='bold')
 
@@ -81,12 +102,10 @@ def train_and_track(model, optimizers, trainloader, testloader, device, epochs=2
         ax.grid(True, linestyle='--', alpha=0.6)
 
     plt.tight_layout()
-    safe_name = experiment_name.replace(" ", "_").lower()
     
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, f"{safe_name}_plot.png")
-    plt.savefig(save_path)
-    print(f"Saved final plot to {save_path}")
+    plot_path = os.path.join(output_dir, f"{safe_name}_plot.png")
+    plt.savefig(plot_path)
+    print(f"Saved final plot to {plot_path}")
     plt.close(fig)
 
     return test_acc_s0_history, test_acc_s1_history
