@@ -218,8 +218,26 @@ def train_and_track(model, optimizers, trainloader, evalloader, testloader, devi
     for ax in axs.flat if is_cifar else [ax]:
         ax.grid(True); ax.set_ylim(0, 105)
     plt.tight_layout()
+    
+    # Save the plot
     plt.savefig(os.path.join(output_dir, f"{exp_name.replace(' ', '_').lower()}.png"))
     plt.close(fig)
+
+    # =========================================================
+    # NEW: TEXT LOGGING BLOCK
+    # =========================================================
+    log_file_path = os.path.join(output_dir, f"{exp_name.replace(' ', '_').lower()}_logs.txt")
+    with open(log_file_path, "w") as f:
+        if is_cifar:
+            f.write("Epoch\tTrain_S0_Acc\tTrain_S1_Acc\tTest_S0_Acc\tTest_S1_Acc\n")
+            for i in range(len(metrics['train_acc_s0'])):
+                f.write(f"{i}\t{metrics['train_acc_s0'][i]:.2f}\t{metrics['train_acc_s1'][i]:.2f}\t{metrics['test_acc_s0'][i]:.2f}\t{metrics['test_acc_s1'][i]:.2f}\n")
+        else:
+            f.write("Epoch\tTrain_Acc\tTest_Acc\n")
+            for i in range(len(metrics['train_acc_s0'])):
+                f.write(f"{i}\t{metrics['train_acc_s0'][i]:.2f}\t{metrics['test_acc_s0'][i]:.2f}\n")
+    print(f"[{exp_name}] Accuracy logs saved to: {log_file_path}")
+    # =========================================================
 
     return metrics
 
