@@ -4,5 +4,5 @@ scikit-learn
 pandas
 matplotlib
 numpy
-pytorch-tabnet
 datasets
+rtdl --no-deps
